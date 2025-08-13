@@ -10,6 +10,7 @@ import { Upload } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useLocation } from "wouter";
 
 export default function ComplaintForm() {
   const [formData, setFormData] = useState({
@@ -18,6 +19,7 @@ export default function ComplaintForm() {
     description: "",
   });
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const createComplaintMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -39,7 +41,7 @@ export default function ComplaintForm() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          setLocation("/login"); // Use a client-side route for login
         }, 500);
         return;
       }
@@ -133,7 +135,7 @@ export default function ComplaintForm() {
           <Button
             type="submit"
             disabled={createComplaintMutation.isPending}
-            className="w-full bg-primary text-white hover:bg-blue-700 transition-colors"
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 px-8 py-3 rounded-xl font-bold shadow-lg transition-all duration-300 transform hover:scale-105"
           >
             {createComplaintMutation.isPending ? "Submitting..." : "Submit Complaint"}
           </Button>

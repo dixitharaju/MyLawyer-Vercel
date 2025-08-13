@@ -1,6 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import session from 'express-session';
+import { useLocation } from "wouter";
+import { connectToDatabase } from "./db";
 
 const app = express();
 app.use(express.json());
@@ -37,6 +40,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Connect to MongoDB
+  try {
+    await connectToDatabase();
+    log("Connected to MongoDB successfully");
+  } catch (error) {
+    log(`Failed to connect to MongoDB: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -44,7 +56,7 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    ;
   });
 
   // importantly only setup vite in development and after
@@ -61,11 +73,38 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  server.listen(port, '127.0.0.1', () => {
     log(`serving on port ${port}`);
+  }).on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE' || err.code === 'ENOTSUP') {
+      console.log(`Port ${port} unavailable, trying ${port+1}`);
+      startServer(port+1);
+    } else {
+      console.error('Server error:', err);
+      process.exit(1);
+    }
   });
+  const startServer = (port: number) => {
+    const server = app.listen(port, 'localhost', () => {
+      console.log(`Server running on http://localhost:${port}`);
+    }).on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE' || err.code === 'ENOTSUP') {
+        console.log(`Port ${port} unavailable, trying ${port+1}`);
+        startServer(port+1);
+      } else {
+        console.error('Server error:', err);
+        process.exit(1);
+      }
+    });
+  };
+
+  // Ensure the port is a number, defaulting to 3000 if not specified
+  const initialPort = parseInt(process.env.PORT || '3000', 10);
+  startServer(initialPort);
 })();
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));

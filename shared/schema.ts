@@ -75,7 +75,7 @@ export const legalArticles = pgTable("legal_articles", {
 
 // Complaints
 export const complaints = pgTable("complaints", {
-  id: serial("id").primaryKey(),
+  id: varchar("id").primaryKey().notNull(), // Changed to varchar for MongoDB ObjectId compatibility
   userId: varchar("user_id").references(() => users.id).notNull(),
   complaintNumber: varchar("complaint_number").unique().notNull(),
   type: varchar("type").notNull(),

@@ -1,13 +1,28 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+// Remove or comment out this line:
+// import replitAuth from './replitAuth';
 import { generateLegalResponse, categorizeComplaint, generateConversationTitle } from "./services/openai";
 import { insertConversationSchema, insertMessageSchema, insertComplaintSchema, insertCommunityPostSchema, insertCommunityPostCommentSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', message: 'Server is running' });
+  });
+
   // Auth middleware
-  await setupAuth(app);
+  // TODO: Implement auth setup
+  // For now, using a basic middleware that marks all requests as authenticated
+  app.use((req: any, _res: any, next: any) => {
+    req.user = {
+      claims: {
+        sub: 'default-user-id'
+      }
+    };
+    next();
+  });
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -129,6 +144,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/complaints', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log('Creating complaint for user:', userId, 'with data:', req.body);
+      
       const validatedData = insertComplaintSchema.parse({
         ...req.body,
         userId
@@ -142,10 +159,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priority: analysis.priority,
       });
 
+      console.log('Complaint created successfully:', complaint);
       res.json({ complaint, suggestedActions: analysis.suggestedActions });
     } catch (error) {
       console.error("Error creating complaint:", error);
-      res.status(500).json({ message: "Failed to create complaint" });
+      res.status(500).json({ message: "Failed to create complaint", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Test endpoint for complaints (no auth required for testing)
+  app.post('/api/complaints/test', async (req: any, res) => {
+    try {
+      console.log('Test complaint creation with data:', req.body);
+      
+      const testComplaint = {
+        userId: 'test-user-id',
+        type: req.body.type || 'test',
+        subject: req.body.subject || 'Test Complaint',
+        description: req.body.description || 'This is a test complaint'
+      };
+      
+      const complaint = await storage.createComplaint(testComplaint);
+      console.log('Test complaint created successfully:', complaint);
+      res.json({ success: true, complaint });
+    } catch (error) {
+      console.error("Error creating test complaint:", error);
+      res.status(500).json({ message: "Failed to create test complaint", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -162,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/complaints/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const complaintId = parseInt(req.params.id);
+      const complaintId = req.params.id; // Changed to string for MongoDB
       const complaint = await storage.getComplaint(complaintId);
       
       if (!complaint) {
@@ -297,3 +336,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
+
+const isAuthenticated = (req: any, res: any, next: any) => {
+  // Check for user authentication - support both session and claims-based auth
+  if (req.user?.claims?.sub || req.session?.userId) {
+    return next();
+  }
+  res.status(401).json({ error: 'Unauthorized' });
+};

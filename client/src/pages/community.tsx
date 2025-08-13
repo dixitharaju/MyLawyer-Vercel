@@ -40,7 +40,7 @@ export default function Community() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          setLocation("/login"); // Use a client-side route for login
         }, 500);
         return;
       }
@@ -76,7 +76,7 @@ export default function Community() {
           <Button
             onClick={handleCreatePost}
             disabled={createPostMutation.isPending}
-            className="ml-auto bg-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
+            className="ml-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all duration-300 transform hover:scale-105"
           >
             <Plus className="w-4 h-4 mr-2" />
             Post
@@ -100,7 +100,7 @@ export default function Community() {
 
           {/* Community Posts */}
           <div className="space-y-4">
-            {posts?.map((post) => (
+            {Array.isArray(posts) && posts.map((post: any) => (
               <CommunityPost
                 key={post.id}
                 post={post}

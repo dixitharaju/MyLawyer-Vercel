@@ -13,16 +13,16 @@
   --card-foreground: hsl(20, 14.3%, 4.1%);
   --border: hsl(20, 5.9%, 90%);
   --input: hsl(20, 5.9%, 90%);
-  --primary: hsl(207, 90%, 54%);
+  --primary: hsl(262, 91%, 48%);
   --primary-foreground: hsl(211, 100%, 99%);
-  --secondary: hsl(120, 100%, 25%);
+  --secondary: hsl(142, 76%, 36%);
   --secondary-foreground: hsl(60, 9.1%, 97.8%);
   --accent: hsl(35, 100%, 50%);
   --accent-foreground: hsl(210, 40%, 98%);
   --destructive: hsl(0, 84.2%, 60.2%);
   --destructive-foreground: hsl(60, 9.1%, 97.8%);
-  --ring: hsl(20, 14.3%, 4.1%);
-  --radius: 0.5rem;
+  --ring: hsl(262, 100%, 50%);
+  --radius: 0.75rem;
 }
 
 .dark {
@@ -36,7 +36,7 @@
   --card-foreground: hsl(0, 0%, 98%);
   --border: hsl(240, 3.7%, 15.9%);
   --input: hsl(240, 3.7%, 15.9%);
-  --primary: hsl(207, 90%, 54%);
+  --primary: hsl(262, 100%, 50%);
   --primary-foreground: hsl(211, 100%, 99%);
   --secondary: hsl(240, 3.7%, 15.9%);
   --secondary-foreground: hsl(0, 0%, 98%);
@@ -44,8 +44,8 @@
   --accent-foreground: hsl(0, 0%, 98%);
   --destructive: hsl(0, 62.8%, 30.6%);
   --destructive-foreground: hsl(0, 0%, 98%);
-  --ring: hsl(240, 4.9%, 83.9%);
-  --radius: 0.5rem;
+  --ring: hsl(262, 100%, 50%);
+  --radius: 0.75rem;
 }
 
 @layer base {
@@ -64,42 +64,102 @@
     max-width: 375px;
     margin: 0 auto;
     min-height: 100vh;
-    background: hsl(0, 0%, 98%);
-    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    background: linear-gradient(135deg, hsl(0, 0%, 98%) 0%, hsl(0, 0%, 100%) 100%);
+    box-shadow: 0 0 30px rgba(0,0,0,0.1);
+    border-radius: 20px;
+    overflow: hidden;
   }
   
   .chat-bubble-user {
-    background: linear-gradient(135deg, hsl(207, 90%, 54%) 0%, hsl(207, 90%, 64%) 100%);
+    background: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(315, 100%, 60%) 100%);
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
   }
   
   .chat-bubble-ai {
-    background: linear-gradient(135deg, hsl(0, 0%, 96%) 0%, hsl(0, 0%, 88%) 100%);
+    background: linear-gradient(135deg, hsl(0, 0%, 100%) 0%, hsl(0, 0%, 96%) 100%);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   }
   
   .bottom-nav-item.active {
-    color: hsl(207, 90%, 54%);
+    color: hsl(262, 83%, 58%);
+    background: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(315, 100%, 60%) 100%);
   }
   
   .glassmorphism {
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px);
     background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
   
   .slide-in {
-    animation: slideIn 0.3s ease-out;
+    animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   @keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+    from { 
+      transform: translateX(100%); 
+      opacity: 0; 
+    }
+    to { 
+      transform: translateX(0); 
+      opacity: 1; 
+    }
   }
   
   .fade-in {
-    animation: fadeIn 0.5s ease-out;
+    animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { 
+      opacity: 0; 
+      transform: translateY(30px); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0); 
+    }
+  }
+  
+  .bounce-in {
+    animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+  
+  @keyframes bounceIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+    70% {
+      transform: scale(0.9);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(315, 100%, 60%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .glow {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  
+  .hover-lift {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   }
 }

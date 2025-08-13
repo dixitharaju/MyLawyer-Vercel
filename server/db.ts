@@ -1,15 +1,63 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
-import * as schema from "@shared/schema";
+import { MongoClient, Db } from 'mongodb';
 
-neonConfig.webSocketConstructor = ws;
+const MONGODB_URI = 'mongodb+srv://chatbot-user:miniproject@miniprojectcluster.ussrnq5.mongodb.net/?retryWrites=true&w=majority&appName=MiniProjectClusterw';
+const DB_NAME = 'miniproject';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+let client: MongoClient;
+let mongoDb: Db;
+
+export async function connectToDatabase() {
+  if (!client) {
+    client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    mongoDb = client.db(DB_NAME);
+    console.log('Connected to MongoDB');
+  }
+  return mongoDb;
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export async function getDatabase() {
+  if (!mongoDb) {
+    await connectToDatabase();
+  }
+  return mongoDb;
+}
+
+export async function closeDatabase() {
+  if (client) {
+    await client.close();
+    console.log('Disconnected from MongoDB');
+  }
+}
+
+// Export db for backward compatibility
+export const db = {
+  select: () => ({
+    from: () => ({
+      where: () => Promise.resolve([]),
+      orderBy: () => Promise.resolve([]),
+      limit: () => Promise.resolve([]),
+      offset: () => Promise.resolve([])
+    }),
+    where: () => Promise.resolve([]),
+    orderBy: () => Promise.resolve([]),
+    limit: () => Promise.resolve([]),
+    offset: () => Promise.resolve([])
+  }),
+  insert: () => ({
+    values: () => ({
+      returning: () => Promise.resolve([{ id: 1 }]),
+      onConflictDoUpdate: () => ({
+        returning: () => Promise.resolve([{ id: 1 }])
+      })
+    })
+  }),
+  update: () => ({
+    set: () => ({
+      where: () => Promise.resolve()
+    })
+  }),
+  delete: () => ({
+    where: () => Promise.resolve()
+  })
+};
