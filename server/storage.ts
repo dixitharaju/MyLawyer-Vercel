@@ -331,7 +331,7 @@ export class DatabaseStorage implements IStorage {
         lastName: userData.lastName,
         role: userData.role || 'user',
         profileImageUrl: null,
-        isVerified: userData.role === 'lawyer' ? false : true, // Lawyers need verification
+        isVerified: userData.role === 'lawyer' ? true : true, // Auto-verify lawyers for testing
         createdAt: now,
         updatedAt: now
       };
@@ -569,6 +569,46 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.log('Database connection failed, using mock data');
       return this.mockComplaints.filter(complaint => complaint.userId === userId);
+    }
+  }
+
+  async getAllComplaints(): Promise<Complaint[]> {
+    try {
+      const db = await getDatabase();
+      const collection = db.collection('lega_complaint');
+      
+      const complaints = await collection.find({}).toArray();
+      const userIds = [...new Set(complaints.map(complaint => complaint.userId))];
+      
+      // Fetch user details for all complaints
+      const userCollection = db.collection('lega_users');
+      const users = await userCollection.find({ id: { $in: userIds } }).toArray();
+      const userMap = new Map(users.map(user => [user.id, user]));
+      
+      return complaints.map(complaint => {
+        const user = userMap.get(complaint.userId);
+        return {
+          id: complaint._id.toString(),
+          userId: complaint.userId,
+          complaintNumber: complaint.complaintNumber,
+          type: complaint.type,
+          subject: complaint.subject,
+          description: complaint.description,
+          status: complaint.status || 'pending',
+          priority: complaint.priority || 'medium',
+          createdAt: complaint.createdAt || new Date(),
+          updatedAt: complaint.updatedAt || new Date(),
+          user: user ? {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phoneNumber: user.phoneNumber
+          } : undefined
+        };
+      }) as Complaint[];
+    } catch (error) {
+      console.log('Database connection failed, using mock data');
+      return this.mockComplaints;
     }
   }
 

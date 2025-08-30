@@ -66,7 +66,23 @@ export default function LawyerDashboard() {
   const fetchComplaints = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/lawyer/complaints');
+      
+      // Get the user ID from session storage
+      const userId = sessionStorage.getItem('userId');
+      
+      // Add the Authorization header with the user ID as a Bearer token
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (userId) {
+        headers['Authorization'] = `Bearer ${userId}`;
+      }
+      
+      const response = await fetch('/api/lawyer/complaints', {
+        headers
+      });
+      
       if (response.ok) {
         const data = await response.json();
         setComplaints(data);
@@ -80,17 +96,14 @@ export default function LawyerDashboard() {
         };
         setStats(stats);
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to fetch complaints",
-          variant: "destructive",
-        });
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch complaints');
       }
     } catch (error) {
       console.error('Error fetching complaints:', error);
       toast({
         title: "Error",
-        description: "Failed to load complaints",
+        description: error instanceof Error ? error.message : "Failed to load complaints",
         variant: "destructive",
       });
     } finally {
@@ -100,11 +113,21 @@ export default function LawyerDashboard() {
 
   const handleStatusUpdate = async (complaintId: string, newStatus: string) => {
     try {
+      // Get the user ID from session storage
+      const userId = sessionStorage.getItem('userId');
+      
+      // Add the Authorization header with the user ID as a Bearer token
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (userId) {
+        headers['Authorization'] = `Bearer ${userId}`;
+      }
+      
       const response = await fetch(`/api/lawyer/complaints/${complaintId}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ status: newStatus }),
       });
 
@@ -115,12 +138,13 @@ export default function LawyerDashboard() {
         });
         fetchComplaints(); // Refresh the list
       } else {
-        throw new Error('Failed to update status');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update status');
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update complaint status",
+        description: error instanceof Error ? error.message : "Failed to update complaint status",
         variant: "destructive",
       });
     }

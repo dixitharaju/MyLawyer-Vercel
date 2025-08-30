@@ -50,7 +50,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // For development purposes only, set a default user if not authenticated
     // In production, you would redirect to login or return 401 Unauthorized
-    req.user = { claims: { sub: 'user-123456' } };
+    // Comment out the default user to enforce authentication
+    // req.user = { claims: { sub: 'user-123456' } };
     next();
   });
 
@@ -323,6 +324,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching complaints:", error);
       res.status(500).json({ error: "Failed to fetch complaints" });
+    }
+  });
+  
+  // Lawyer routes
+  app.get('/api/lawyer/complaints', isAuthenticated, async (req: any, res) => {
+    try {
+      // Get the user to check if they are a lawyer
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'lawyer') {
+        return res.status(403).json({ error: "Access denied. Only lawyers can access this endpoint." });
+      }
+      
+      const complaints = await storage.getAllComplaints();
+      res.json(complaints);
+    } catch (error) {
+      console.error("Error fetching all complaints:", error);
+      res.status(500).json({ error: "Failed to fetch complaints" });
+    }
+  });
+  
+  app.put('/api/lawyer/complaints/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'lawyer') {
+        return res.status(403).json({ error: "Access denied. Only lawyers can update complaint status." });
+      }
+      
+      await storage.updateComplaintStatus(id, status);
+      res.json({ success: true, message: "Complaint status updated successfully" });
+    } catch (error) {
+      console.error("Error updating complaint status:", error);
+      res.status(500).json({ error: "Failed to update complaint status" });
     }
   });
 
