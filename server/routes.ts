@@ -4,23 +4,53 @@ import { storage } from "./storage";
 // Remove or comment out this line:
 // import replitAuth from './replitAuth';
 import { generateLegalResponse, categorizeComplaint, generateConversationTitle } from "./services/openai";
+import { generateEnhancedLegalResponse } from "./services/legalBot";
 import { insertConversationSchema, insertMessageSchema, insertComplaintSchema, insertCommunityPostSchema, insertCommunityPostCommentSchema } from "@shared/schema";
+import path from "path";
+import express from "express";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Check if dist/public exists (Vite build output), if not, we're in development mode
+  const clientDistPath = path.join(__dirname, "../dist/public");
+  const fs = await import('fs');
+  
+  // Serve static files only if they exist
+  if (fs.existsSync(clientDistPath)) {
+    app.use(express.static(clientDistPath));
+  }
+
   // Health check endpoint
   app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', message: 'Server is running' });
   });
 
-  // Auth middleware
-  // TODO: Implement auth setup
-  // For now, using a basic middleware that marks all requests as authenticated
-  app.use((req: any, _res: any, next: any) => {
-    req.user = {
-      claims: {
-        sub: 'default-user-id'
+  // Authentication middleware
+  app.use((req: any, res: any, next: any) => {
+    // Check if user is authenticated via session
+    if (req.session?.userId) {
+      req.user = { claims: { sub: req.session.userId } };
+      return next();
+    }
+    
+    // Check for Authorization header with Bearer token
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const userId = authHeader.split(' ')[1];
+      if (userId) {
+        req.user = { claims: { sub: userId } };
+        return next();
       }
-    };
+    }
+    
+    // For development purposes only, set a default user if not authenticated
+    // In production, you would redirect to login or return 401 Unauthorized
+    req.user = { claims: { sub: 'user-123456' } };
     next();
   });
 
@@ -36,78 +66,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chat routes
-  app.post('/api/chat/conversations', isAuthenticated, async (req: any, res) => {
+  // Signup route
+  app.post('/api/auth/signup', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const validatedData = insertConversationSchema.parse({
-        userId,
-        title: req.body.title || "New Conversation"
-      });
+      const signupData = req.body;
       
-      const conversation = await storage.createConversation(validatedData);
-      res.json(conversation);
+      // Validate required fields
+      if (!signupData.email || !signupData.password || !signupData.firstName || !signupData.lastName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.authenticateUser(signupData.email, "");
+      if (existingUser) {
+        return res.status(400).json({ error: "User already exists with this email" });
+      }
+
+      // Create user in MongoDB
+      const newUser = await storage.createUserFromSignup(signupData);
+      
+      res.status(201).json({ 
+        message: "User created successfully", 
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          role: newUser.role,
+          isVerified: newUser.isVerified
+        }
+      });
     } catch (error) {
-      console.error("Error creating conversation:", error);
-      res.status(500).json({ message: "Failed to create conversation" });
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user" });
     }
   });
 
-  app.get('/api/chat/conversations', isAuthenticated, async (req: any, res) => {
+  // Login route
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const user = await storage.authenticateUser(email, password);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Store user ID in session
+      if (req.session) {
+        req.session.userId = user.id;
+      }
+
+      res.json({ 
+        success: true, 
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          isVerified: user.isVerified
+        }
+      });
+    } catch (error) {
+      console.error("Error during login:", error);
+      res.status(500).json({ error: "Failed to login" });
+    }
+  });
+
+  // Logout route
+  app.post('/api/auth/logout', (req: any, res) => {
+    // Clear the session
+    if (req.session) {
+      req.session.destroy((err: any) => {
+        if (err) {
+          console.error('Error destroying session:', err);
+          return res.status(500).json({ error: 'Failed to logout' });
+        }
+        res.clearCookie('connect.sid'); // Clear the session cookie
+        res.json({ success: true });
+      });
+    } else {
+      res.json({ success: true });
+    }
+  });
+
+  // Chat routes
+  app.post('/api/chat/conversations', async (req: any, res) => {
+    try {
+      const conversationData = req.body;
+      const userId = req.user.claims.sub;
+      
+      console.log('Creating conversation with userId:', userId);
+      console.log('Conversation data:', conversationData);
+      
+      const conversation = await storage.createConversation({
+        ...conversationData,
+        userId
+      });
+      
+      console.log('Conversation created:', conversation);
+      res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  app.get('/api/chat/conversations', async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log('Fetching conversations for user:', userId);
+      console.log('User object:', req.user);
+      
       const conversations = await storage.getUserConversations(userId);
+      console.log('Conversations found:', conversations.length);
+      
       res.json(conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
-      res.status(500).json({ message: "Failed to fetch conversations" });
+      res.status(500).json({ error: "Failed to fetch conversations" });
     }
   });
 
-  app.get('/api/chat/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
+  app.post('/api/chat/conversations/:id/messages', async (req: any, res) => {
     try {
-      const conversationId = parseInt(req.params.id);
-      const messages = await storage.getConversationMessages(conversationId);
+      const { id } = req.params;
+      const messageData = req.body;
+      const userId = req.user.claims.sub;
+      
+      console.log('Creating message for conversation:', id);
+      console.log('Message data:', messageData);
+      console.log('User ID:', userId);
+      
+      // Create the user message
+      const userMessage = await storage.createMessage({
+        conversationId: parseInt(id),
+        role: "user",
+        content: messageData.content
+      });
+      
+      console.log('User message created:', userMessage);
+      
+      // Get conversation history for context
+      const conversationMessages = await storage.getConversationMessages(parseInt(id));
+      console.log('Conversation history length:', conversationMessages.length);
+      const conversationHistory = conversationMessages.map(msg => `${msg.role}: ${msg.content}`);
+      
+      // Generate AI response using the legal bot
+      let aiResponse: string;
+      try {
+        console.log('Generating AI response...');
+        aiResponse = await generateEnhancedLegalResponse(messageData.content, conversationHistory);
+        console.log('AI response generated successfully');
+      } catch (aiError) {
+        console.error("AI response generation error:", aiError);
+        aiResponse = "I apologize, but I'm having trouble processing your request right now. Please try again in a moment.";
+      }
+      
+      // Create the AI assistant message
+      const assistantMessage = await storage.createMessage({
+        conversationId: parseInt(id),
+        role: "assistant",
+        content: aiResponse
+      });
+      
+      console.log('Assistant message created:', assistantMessage);
+      
+      // Return both messages
+      res.status(201).json({
+        userMessage,
+        assistantMessage
+      });
+    } catch (error) {
+      console.error("Error creating message:", error);
+      res.status(500).json({ error: "Failed to create message" });
+    }
+  });
+
+  app.get('/api/chat/conversations/:id/messages', async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      console.log('Fetching messages for conversation:', id);
+      console.log('User ID:', userId);
+      
+      const messages = await storage.getConversationMessages(parseInt(id));
+      console.log('Messages found:', messages.length);
+      
       res.json(messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
-      res.status(500).json({ message: "Failed to fetch messages" });
-    }
-  });
-
-  app.post('/api/chat/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
-    try {
-      const conversationId = parseInt(req.params.id);
-      const { content } = req.body;
-      
-      // Save user message
-      const userMessage = await storage.createMessage({
-        conversationId,
-        role: 'user',
-        content
-      });
-
-      // Generate AI response
-      const aiResponse = await generateLegalResponse(content);
-      
-      // Save AI message
-      const aiMessage = await storage.createMessage({
-        conversationId,
-        role: 'assistant',
-        content: aiResponse
-      });
-
-      // Update conversation title if it's the first message
-      const messages = await storage.getConversationMessages(conversationId);
-      if (messages.length === 2) { // First user message + AI response
-        const title = await generateConversationTitle([content]);
-        // Update conversation title - we'll need to add this method to storage
-      }
-
-      res.json({ userMessage, aiMessage });
-    } catch (error) {
-      console.error("Error sending message:", error);
-      res.status(500).json({ message: "Failed to send message" });
+      res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
 
@@ -117,101 +272,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const categories = await storage.getLegalCategories();
       res.json(categories);
     } catch (error) {
-      console.error("Error fetching categories:", error);
-      res.status(500).json({ message: "Failed to fetch categories" });
+      console.error("Error fetching legal categories:", error);
+      res.status(500).json({ error: "Failed to fetch legal categories" });
     }
   });
 
   app.get('/api/legal/articles', async (req, res) => {
     try {
-      const { categoryId, search } = req.query;
+      const { search, categoryId } = req.query;
       let articles;
       
       if (search) {
         articles = await storage.searchLegalArticles(search as string);
+      } else if (categoryId) {
+        articles = await storage.getLegalArticles(parseInt(categoryId as string));
       } else {
-        articles = await storage.getLegalArticles(categoryId ? parseInt(categoryId as string) : undefined);
+        articles = await storage.getLegalArticles();
       }
       
       res.json(articles);
     } catch (error) {
-      console.error("Error fetching articles:", error);
-      res.status(500).json({ message: "Failed to fetch articles" });
+      console.error("Error fetching legal articles:", error);
+      res.status(500).json({ error: "Failed to fetch legal articles" });
     }
   });
 
   // Complaint routes
-  app.post('/api/complaints', isAuthenticated, async (req: any, res) => {
+  app.post('/api/complaints', async (req: any, res) => {
     try {
+      const complaintData = req.body;
       const userId = req.user.claims.sub;
-      console.log('Creating complaint for user:', userId, 'with data:', req.body);
-      
-      const validatedData = insertComplaintSchema.parse({
-        ...req.body,
-        userId
-      });
-
-      // Categorize complaint using AI
-      const analysis = await categorizeComplaint(validatedData.description);
       
       const complaint = await storage.createComplaint({
-        ...validatedData,
-        priority: analysis.priority,
+        ...complaintData,
+        userId
       });
-
-      console.log('Complaint created successfully:', complaint);
-      res.json({ complaint, suggestedActions: analysis.suggestedActions });
+      
+      res.status(201).json(complaint);
     } catch (error) {
       console.error("Error creating complaint:", error);
-      res.status(500).json({ message: "Failed to create complaint", error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: "Failed to create complaint" });
     }
   });
 
-  // Test endpoint for complaints (no auth required for testing)
-  app.post('/api/complaints/test', async (req: any, res) => {
-    try {
-      console.log('Test complaint creation with data:', req.body);
-      
-      const testComplaint = {
-        userId: 'test-user-id',
-        type: req.body.type || 'test',
-        subject: req.body.subject || 'Test Complaint',
-        description: req.body.description || 'This is a test complaint'
-      };
-      
-      const complaint = await storage.createComplaint(testComplaint);
-      console.log('Test complaint created successfully:', complaint);
-      res.json({ success: true, complaint });
-    } catch (error) {
-      console.error("Error creating test complaint:", error);
-      res.status(500).json({ message: "Failed to create test complaint", error: error instanceof Error ? error.message : String(error) });
-    }
-  });
-
-  app.get('/api/complaints', isAuthenticated, async (req: any, res) => {
+  app.get('/api/complaints', async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const complaints = await storage.getUserComplaints(userId);
       res.json(complaints);
     } catch (error) {
       console.error("Error fetching complaints:", error);
-      res.status(500).json({ message: "Failed to fetch complaints" });
+      res.status(500).json({ error: "Failed to fetch complaints" });
     }
   });
 
-  app.get('/api/complaints/:id', isAuthenticated, async (req: any, res) => {
+  app.get('/api/complaints/:id', async (req, res) => {
     try {
-      const complaintId = req.params.id; // Changed to string for MongoDB
-      const complaint = await storage.getComplaint(complaintId);
+      const { id } = req.params;
+      const complaint = await storage.getComplaint(id);
       
       if (!complaint) {
-        return res.status(404).json({ message: "Complaint not found" });
+        return res.status(404).json({ error: "Complaint not found" });
       }
       
       res.json(complaint);
     } catch (error) {
       console.error("Error fetching complaint:", error);
-      res.status(500).json({ message: "Failed to fetch complaint" });
+      res.status(500).json({ error: "Failed to fetch complaint" });
     }
   });
 
@@ -219,118 +346,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/community/posts', async (req, res) => {
     try {
       const { limit = 20, offset = 0 } = req.query;
-      const posts = await storage.getCommunityPosts(
-        parseInt(limit as string),
-        parseInt(offset as string)
-      );
+      const posts = await storage.getCommunityPosts(parseInt(limit as string), parseInt(offset as string));
       res.json(posts);
     } catch (error) {
       console.error("Error fetching community posts:", error);
-      res.status(500).json({ message: "Failed to fetch community posts" });
+      res.status(500).json({ error: "Failed to fetch community posts" });
     }
   });
 
-  app.post('/api/community/posts', isAuthenticated, async (req: any, res) => {
+  app.post('/api/community/posts', async (req: any, res) => {
     try {
+      const postData = req.body;
       const userId = req.user.claims.sub;
-      const validatedData = insertCommunityPostSchema.parse({
-        ...req.body,
+      
+      const post = await storage.createCommunityPost({
+        ...postData,
         userId
       });
       
-      const post = await storage.createCommunityPost(validatedData);
-      res.json(post);
+      res.status(201).json(post);
     } catch (error) {
       console.error("Error creating community post:", error);
-      res.status(500).json({ message: "Failed to create community post" });
+      res.status(500).json({ error: "Failed to create community post" });
     }
   });
 
-  app.post('/api/community/posts/:id/like', isAuthenticated, async (req: any, res) => {
+  app.post('/api/community/posts/:id/like', async (req: any, res) => {
     try {
-      const postId = parseInt(req.params.id);
+      const { id } = req.params;
       const userId = req.user.claims.sub;
       
-      await storage.togglePostLike(postId, userId);
-      res.json({ message: "Like toggled successfully" });
+      await storage.togglePostLike(parseInt(id), userId);
+      res.json({ message: "Post like toggled successfully" });
     } catch (error) {
-      console.error("Error toggling like:", error);
-      res.status(500).json({ message: "Failed to toggle like" });
+      console.error("Error toggling post like:", error);
+      res.status(500).json({ error: "Failed to toggle post like" });
     }
   });
 
-  app.post('/api/community/posts/:id/comments', isAuthenticated, async (req: any, res) => {
+  app.post('/api/community/posts/:id/comments', async (req: any, res) => {
     try {
-      const postId = parseInt(req.params.id);
+      const { id } = req.params;
+      const commentData = req.body;
       const userId = req.user.claims.sub;
       
-      const validatedData = insertCommunityPostCommentSchema.parse({
-        postId,
+      const comment = await storage.addPostComment({
+        postId: parseInt(id),
         userId,
-        content: req.body.content
+        content: commentData.content
       });
       
-      const comment = await storage.addPostComment(validatedData);
-      res.json(comment);
+      res.status(201).json(comment);
     } catch (error) {
       console.error("Error adding comment:", error);
-      res.status(500).json({ message: "Failed to add comment" });
+      res.status(500).json({ error: "Failed to add comment" });
     }
   });
 
   app.get('/api/community/posts/:id/comments', async (req, res) => {
     try {
-      const postId = parseInt(req.params.id);
-      const comments = await storage.getPostComments(postId);
+      const { id } = req.params;
+      const comments = await storage.getPostComments(parseInt(id));
       res.json(comments);
     } catch (error) {
       console.error("Error fetching comments:", error);
-      res.status(500).json({ message: "Failed to fetch comments" });
+      res.status(500).json({ error: "Failed to fetch comments" });
     }
   });
 
-  // Initial data seeding (run once)
-  app.post('/api/seed', async (req, res) => {
-    try {
-      // Seed legal categories
-      const categories = [
-        { name: "Family Law", description: "Marriage, divorce, custody, adoption", icon: "fas fa-home" },
-        { name: "Labor Law", description: "Employment rights, wages, working conditions", icon: "fas fa-briefcase" },
-        { name: "Consumer Rights", description: "Product defects, service issues, warranties", icon: "fas fa-shield-alt" },
-        { name: "Education Rights", description: "School admission, scholarships, educational policies", icon: "fas fa-graduation-cap" },
-        { name: "Property Law", description: "Real estate, rental agreements, property disputes", icon: "fas fa-building" },
-        { name: "Criminal Law", description: "Criminal offenses, bail, legal procedures", icon: "fas fa-gavel" },
-      ];
-
-      for (const category of categories) {
-        await storage.createLegalCategory(category);
-      }
-
-      // Seed sample articles
-      const articles = [
-        {
-          categoryId: 2, // Labor Law
-          title: "Understanding Your Rights as a Worker",
-          content: "Every worker in India has fundamental rights under various labor laws. This includes the right to minimum wages, safe working conditions, and reasonable working hours. The Minimum Wages Act, 1948 ensures that workers receive fair compensation for their work. The Factories Act, 1948 provides guidelines for working hours, overtime pay, and workplace safety. Workers are entitled to overtime pay at double the regular rate for work beyond 8 hours per day or 48 hours per week.",
-          summary: "Learn about minimum wage, working hours, and workplace safety under Indian labor laws."
-        },
-        {
-          categoryId: 3, // Consumer Rights
-          title: "Consumer Protection Act 2019",
-          content: "The Consumer Protection Act 2019 replaced the earlier 1986 Act and provides stronger protection for consumers. Key features include the establishment of the Central Consumer Protection Authority (CCPA), product liability provisions, and expanded definition of consumers to include online transactions. Consumers have the right to seek compensation for defective products, deficient services, and unfair trade practices. The Act also covers e-commerce transactions and provides mechanisms for class action suits.",
-          summary: "New updates and how they affect your consumer rights under the 2019 Act."
-        }
-      ];
-
-      for (const article of articles) {
-        await storage.createLegalArticle(article);
-      }
-
-      res.json({ message: "Data seeded successfully" });
-    } catch (error) {
-      console.error("Error seeding data:", error);
-      res.status(500).json({ message: "Failed to seed data" });
+  // Catch-all route for client-side routing (MUST BE LAST)
+  app.get("*", (req, res) => {
+    // Don't serve the main app for API routes
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({ error: "API endpoint not found" });
     }
+    
+    // In development mode, if dist/public doesn't exist, serve a simple message
+    if (!fs.existsSync(clientDistPath)) {
+      return res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>LawyerConnect - Development Mode</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .status { color: #666; margin: 20px 0; }
+            .api-status { background: #f0f0f0; padding: 20px; border-radius: 8px; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🤖 LawyerConnect</h1>
+            <p class="status">Development server is running!</p>
+            <div class="api-status">
+              <h3>API Endpoints Available:</h3>
+              <ul style="text-align: left; display: inline-block;">
+                <li><code>/api/health</code> - Health check</li>
+                <li><code>/api/auth/*</code> - Authentication endpoints</li>
+                <li><code>/api/chat/*</code> - Chat functionality</li>
+                <li><code>/api/complaints/*</code> - Complaint management</li>
+                <li><code>/api/community/*</code> - Community features</li>
+                <li><code>/api/legal/*</code> - Legal library</li>
+              </ul>
+            </div>
+            <p>To build the frontend, run: <code>npm run build</code></p>
+            <p>Or use Vite dev server for hot reloading</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
+    // Serve the main app for all other routes
+    res.sendFile(path.join(__dirname, "../dist/public/index.html"));
   });
 
   const httpServer = createServer(app);
@@ -339,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 const isAuthenticated = (req: any, res: any, next: any) => {
   // Check for user authentication - support both session and claims-based auth
-  if (req.user?.claims?.sub || req.session?.userId) {
+  if (req.user?.claims?.sub || (req.session as any)?.userId) {
     return next();
   }
   res.status(401).json({ error: 'Unauthorized' });

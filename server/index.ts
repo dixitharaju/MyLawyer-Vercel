@@ -4,10 +4,25 @@ import { setupVite, serveStatic, log } from "./vite";
 import session from 'express-session';
 import { useLocation } from "wouter";
 import { connectToDatabase } from "./db";
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Configure session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'lawyer-connect-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -40,13 +55,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Connect to MongoDB
+  // Connect to MongoDB - but don't exit if it fails
   try {
     await connectToDatabase();
     log("Connected to MongoDB successfully");
   } catch (error) {
     log(`Failed to connect to MongoDB: ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
+    log("Continuing without database connection for development...");
+    // Don't exit - allow the app to run without database for development
   }
 
   const server = await registerRoutes(app);
@@ -56,51 +72,40 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    ;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Setup Vite in development mode
   if (app.get("env") === "development") {
-    await setupVite(app, server);
+    try {
+      await setupVite(app, server);
+      log("Vite development server setup complete");
+    } catch (error) {
+      log(`Vite setup failed: ${error instanceof Error ? error.message : String(error)}`);
+      log("Falling back to static file serving...");
+      serveStatic(app);
+    }
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Start the server
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen(port, '127.0.0.1', () => {
-    log(`serving on port ${port}`);
-  }).on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE' || err.code === 'ENOTSUP') {
-      console.log(`Port ${port} unavailable, trying ${port+1}`);
-      startServer(port+1);
-    } else {
-      console.error('Server error:', err);
-      process.exit(1);
-    }
-  });
+  
   const startServer = (port: number) => {
-    const server = app.listen(port, 'localhost', () => {
-      console.log(`Server running on http://localhost:${port}`);
-    }).on('error', (err: any) => {
-      if (err.code === 'EADDRINUSE' || err.code === 'ENOTSUP') {
-        console.log(`Port ${port} unavailable, trying ${port+1}`);
-        startServer(port+1);
+    server.listen(port, '127.0.0.1', () => {
+      log(`Server running on http://localhost:${port}`);
+    }).on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        log(`Port ${port} is in use, trying ${port + 1}`);
+        startServer(port + 1);
       } else {
         console.error('Server error:', err);
         process.exit(1);
       }
     });
   };
-
-  // Ensure the port is a number, defaulting to 3000 if not specified
-  const initialPort = parseInt(process.env.PORT || '3000', 10);
-  startServer(initialPort);
+  
+  startServer(port);
 })();
 app.use(session({
   secret: 'your-secret-key',

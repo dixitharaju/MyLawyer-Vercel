@@ -73,7 +73,7 @@ export default function Home() {
                   <span className="text-xs opacity-90 mt-1">Submit your case</span>
                 </Button>
                 <Button 
-                  onClick={() => setLocation("/legal")}
+                  onClick={() => setLocation("/legal-library")}
                   className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-6 rounded-xl text-center hover:from-indigo-600 hover:to-purple-700 transition-all duration-500 h-auto flex flex-col shadow-lg hover:shadow-2xl hover:shadow-indigo-500/25 transform hover:scale-105 hover:-translate-y-1"
                 >
                   <BookOpen className="w-8 h-8 mb-3" />

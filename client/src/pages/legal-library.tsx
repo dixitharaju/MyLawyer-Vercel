@@ -7,16 +7,31 @@ import { ArrowLeft, Search, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import BottomNav from "@/components/bottom-nav";
 
+interface LegalCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+interface LegalArticle {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  categoryId: string;
+  createdAt: string;
+}
+
 export default function LegalLibrary() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: categories } = useQuery({
+  const { data: categories } = useQuery<LegalCategory[]>({
     queryKey: ["/api/legal/categories"],
   });
 
-  const { data: articles } = useQuery({
-    queryKey: ["/api/legal/articles", { search: searchQuery }],
+  const { data: articles } = useQuery<LegalArticle[]>({
     queryKey: searchQuery ? ["/api/legal/articles", { search: searchQuery }] : ["/api/legal/articles"],
   });
 

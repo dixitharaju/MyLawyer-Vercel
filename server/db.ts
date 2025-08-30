@@ -1,17 +1,31 @@
 import { MongoClient, Db } from 'mongodb';
+import dotenv from 'dotenv';
 
-const MONGODB_URI = 'mongodb+srv://chatbot-user:miniproject@miniprojectcluster.ussrnq5.mongodb.net/?retryWrites=true&w=majority&appName=MiniProjectClusterw';
-const DB_NAME = 'miniproject';
+// Load environment variables
+dotenv.config();
+
+// Use environment variable if available, otherwise use a local MongoDB instance
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lawyerconnect';
+const DB_NAME = process.env.DB_NAME || 'lawyerconnect';
 
 let client: MongoClient;
 let mongoDb: Db;
 
 export async function connectToDatabase() {
   if (!client) {
-    client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    mongoDb = client.db(DB_NAME);
-    console.log('Connected to MongoDB');
+    try {
+      client = new MongoClient(MONGODB_URI);
+      await client.connect();
+      mongoDb = client.db(DB_NAME);
+      console.log(`Connected to MongoDB database: ${DB_NAME}`);
+      
+      // Test the connection
+      await mongoDb.admin().ping();
+      console.log('MongoDB connection test successful');
+    } catch (error) {
+      console.error('Failed to connect to MongoDB:', error);
+      throw error;
+    }
   }
   return mongoDb;
 }

@@ -20,9 +20,11 @@ export default function Complaint() {
   const [activeTab, setActiveTab] = useState<"form" | "list">("form");
   const { toast } = useToast();
 
-  const { data: complaints } = useQuery({
+  const { data: complaints = [] } = useQuery<any[]>({
     queryKey: ["/api/complaints"],
     enabled: !!user,
+    // Add refetch interval to dynamically update complaints when changed by admin
+    refetchInterval: 10000, // Refetch every 10 seconds
   });
 
   const getStatusColor = (status: string) => {
@@ -52,7 +54,7 @@ export default function Complaint() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/home")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -86,8 +88,8 @@ export default function Complaint() {
               <CardContent className="p-4">
                 <h3 className="font-semibold text-gray-800 mb-3">My Complaints</h3>
                 <div className="space-y-3">
-                  {complaints?.map((complaint) => (
-                    <div key={complaint.id} className="border border-gray-200 rounded-lg p-3">
+                  {complaints?.length > 0 ? complaints.map((complaint) => (
+                    <div key={complaint.id} className="border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-800">
                           {complaint.complaintNumber} - {complaint.subject}
@@ -106,7 +108,7 @@ export default function Complaint() {
                         </span>
                       </div>
                     </div>
-                  )) || (
+                  )) : (
                     <div className="text-center py-8">
                       <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                       <p className="text-gray-500 mb-4">No complaints filed yet</p>

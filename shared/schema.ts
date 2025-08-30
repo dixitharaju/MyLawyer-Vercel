@@ -31,6 +31,14 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  role: varchar("role").default("user").notNull(), // user, lawyer
+  phoneNumber: varchar("phone_number"),
+  address: text("address"),
+  // Lawyer-specific fields
+  barNumber: varchar("bar_number"), // Lawyer's bar association number
+  specialization: varchar("specialization"), // Legal specialization
+  experience: integer("experience"), // Years of experience
+  isVerified: boolean("is_verified").default(false), // Lawyer verification status
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -39,7 +47,10 @@ export const users = pgTable("users", {
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
+  lawyerId: varchar("lawyer_id").references(() => users.id), // Optional: for lawyer-user chats
   title: varchar("title"),
+  type: varchar("type").default("ai").notNull(), // ai, lawyer-user
+  status: varchar("status").default("active").notNull(), // active, closed, pending
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -117,6 +128,16 @@ export const communityPostComments = pgTable("community_post_comments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Lawyer case assignments
+export const lawyerCases = pgTable("lawyer_cases", {
+  id: serial("id").primaryKey(),
+  lawyerId: varchar("lawyer_id").references(() => users.id).notNull(),
+  complaintId: varchar("complaint_id").references(() => complaints.id).notNull(),
+  status: varchar("status").default("assigned").notNull(), // assigned, in_progress, closed
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Define relations
 export const usersRelations = relations(users, ({ many }) => ({
   conversations: many(conversations),
@@ -124,10 +145,12 @@ export const usersRelations = relations(users, ({ many }) => ({
   communityPosts: many(communityPosts),
   communityPostLikes: many(communityPostLikes),
   communityPostComments: many(communityPostComments),
+  lawyerCases: many(lawyerCases),
 }));
 
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
   user: one(users, { fields: [conversations.userId], references: [users.id] }),
+  lawyer: one(users, { fields: [conversations.lawyerId], references: [users.id] }),
   messages: many(messages),
 }));
 
@@ -143,8 +166,14 @@ export const legalArticlesRelations = relations(legalArticles, ({ one }) => ({
   category: one(legalCategories, { fields: [legalArticles.categoryId], references: [legalCategories.id] }),
 }));
 
-export const complaintsRelations = relations(complaints, ({ one }) => ({
+export const complaintsRelations = relations(complaints, ({ one, many }) => ({
   user: one(users, { fields: [complaints.userId], references: [users.id] }),
+  lawyerCases: many(lawyerCases),
+}));
+
+export const lawyerCasesRelations = relations(lawyerCases, ({ one }) => ({
+  lawyer: one(users, { fields: [lawyerCases.lawyerId], references: [users.id] }),
+  complaint: one(complaints, { fields: [lawyerCases.complaintId], references: [complaints.id] }),
 }));
 
 export const communityPostsRelations = relations(communityPosts, ({ one, many }) => ({
@@ -164,7 +193,7 @@ export const communityPostCommentsRelations = relations(communityPostComments, (
 }));
 
 // Insert schemas
-export const insertUserSchema = createInsertSchema(users);
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export const insertLegalCategorySchema = createInsertSchema(legalCategories).omit({ id: true, createdAt: true });
@@ -173,6 +202,7 @@ export const insertComplaintSchema = createInsertSchema(complaints).omit({ id: t
 export const insertCommunityPostSchema = createInsertSchema(communityPosts).omit({ id: true, likesCount: true, commentsCount: true, isModerated: true, createdAt: true, updatedAt: true });
 export const insertCommunityPostLikeSchema = createInsertSchema(communityPostLikes).omit({ id: true, createdAt: true });
 export const insertCommunityPostCommentSchema = createInsertSchema(communityPostComments).omit({ id: true, createdAt: true });
+export const insertLawyerCaseSchema = createInsertSchema(lawyerCases).omit({ id: true, assignedAt: true, updatedAt: true });
 
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
@@ -193,3 +223,5 @@ export type InsertCommunityPostLike = z.infer<typeof insertCommunityPostLikeSche
 export type CommunityPostLike = typeof communityPostLikes.$inferSelect;
 export type InsertCommunityPostComment = z.infer<typeof insertCommunityPostCommentSchema>;
 export type CommunityPostComment = typeof communityPostComments.$inferSelect;
+export type InsertLawyerCase = z.infer<typeof insertLawyerCaseSchema>;
+export type LawyerCase = typeof lawyerCases.$inferSelect;
