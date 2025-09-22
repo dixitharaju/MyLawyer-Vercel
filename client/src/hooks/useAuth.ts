@@ -37,6 +37,14 @@ export function useAuth() {
     staleTime: 5 * 60 * 1000 // 5 minutes
   });
 
+  // Add additional logging for debugging
+  console.log('useAuth - Final return values:', {
+    user: user || null,
+    isLoading,
+    isAuthenticated: !!user && !error,
+    error,
+  });
+  
   return {
     user: user || null,
     isLoading,

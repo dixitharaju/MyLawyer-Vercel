@@ -52,12 +52,17 @@ export default function LawyerDashboard() {
     resolved: 0
   });
   
-  // Redirect to profile if user is not a lawyer
+  // Redirect to dashboard if user is not a lawyer
   useEffect(() => {
+    console.log('LawyerDashboard - Current user:', user);
+    console.log('LawyerDashboard - User role:', user?.role);
+    console.log('LawyerDashboard - Session storage userId:', sessionStorage.getItem('userId'));
+    
     if (user && user.role !== 'lawyer') {
-      setLocation('/profile');
+      console.log('LawyerDashboard - Redirecting non-lawyer to profile');
+      window.location.href = '/profile';
     }
-  }, [user, setLocation]);
+  }, [user]);
 
   useEffect(() => {
     fetchComplaints();
@@ -520,7 +525,7 @@ export default function LawyerDashboard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation("/home")}
+              onClick={() => window.location.href = "/lawyer-dashboard"}
               className="flex flex-col items-center space-y-1 p-2"
             >
               <Users className="w-5 h-5" />
@@ -529,7 +534,7 @@ export default function LawyerDashboard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation("/chat")}
+              onClick={() => window.location.href = "/lawyer-chat"}
               className="flex flex-col items-center space-y-1 p-2"
             >
               <MessageSquare className="w-5 h-5" />
@@ -538,20 +543,11 @@ export default function LawyerDashboard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation("/legal-library")}
-              className="flex flex-col items-center space-y-1 p-2"
-            >
-              <BookOpen className="w-5 h-5" />
-              <span className="text-xs">Library</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation("/profile")}
+              onClick={() => window.location.href = "/lawyer-setting"}
               className="flex flex-col items-center space-y-1 p-2"
             >
               <Settings className="w-5 h-5" />
-              <span className="text-xs">Profile</span>
+              <span className="text-xs">Settings</span>
             </Button>
           </div>
         </nav>

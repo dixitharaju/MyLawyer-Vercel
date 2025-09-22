@@ -35,7 +35,7 @@ export default function LandingPage() {
             <div className="flex items-center space-x-3">
               {/* Logo */}
               <img 
-                src="/applogo.png" 
+                src="/mylawyer-logo.svg" 
                 className="w-10 h-10 rounded-xl object-contain"
               />
               <div>

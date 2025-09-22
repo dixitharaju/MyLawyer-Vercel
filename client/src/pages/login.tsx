@@ -66,9 +66,9 @@ export default function LoginPage() {
       // Redirect based on role
       setTimeout(() => {
         if (role === "lawyer") {
-          setLocation("/lawyer-dashboard");
+          window.location.href = "/lawyer-dashboard";
         } else {
-          setLocation("/home");
+          window.location.href = "/home";
         }
       }, 1000);
       

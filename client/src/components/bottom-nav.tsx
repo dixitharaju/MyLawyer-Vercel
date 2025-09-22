@@ -12,7 +12,7 @@ export default function BottomNav({ activeTab }: BottomNavProps) {
   const navItems = [
     { id: "home", icon: Home, label: "Home", path: "/home" },
     { id: "chat", icon: Bot, label: "AI Chat", path: "/chat" },
-    { id: "legal", icon: BookOpen, label: "Library", path: "/legal" },
+    { id: "legal", icon: BookOpen, label: "Library", path: "/legal-library" },
     { id: "complaint", icon: FileText, label: "Complaints", path: "/complaint" },
     { id: "community", icon: Users, label: "Community", path: "/community" },
   ];
