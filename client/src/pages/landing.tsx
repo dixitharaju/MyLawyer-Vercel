@@ -34,8 +34,8 @@ export default function LandingPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Logo */}
-              <img 
-                src="/mylawyer-logo.svg" 
+              <img
+                src="/mylawyer-logo.svg"
                 className="w-10 h-10 rounded-xl object-contain"
               />
               <div>
@@ -43,7 +43,7 @@ export default function LandingPage() {
                 <p className="text-xs text-gray-500">Legal Help App</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Button
                 variant="ghost"
@@ -88,26 +88,26 @@ export default function LandingPage() {
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-4">
           {/* Hero Section */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-10">
             <h1 className="text-2xl font-bold text-gray-900 mb-3 leading-tight">
               Legal Help at Your
               <span className="block bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Fingertips
               </span>
             </h1>
-            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-              Connect with qualified lawyers, get legal advice, and resolve your legal issues 
+            <p className="text-sm text-gray-600 mb-8 leading-relaxed max-w-md mx-auto">
+              Connect with qualified lawyers, get legal advice, and resolve your legal issues
               with our comprehensive legal assistance platform.
             </p>
 
             {/* Role Selection */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">I am a:</h3>
-              <div className="space-y-3">
-                <Card 
-                  className={`cursor-pointer transition-all duration-200 ${
-                    selectedRole === "user" 
-                      ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
+            <div className="mb-8">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4">I am a:</h3>
+              <div className="flex flex-col sm:flex-row justify-center gap-4">
+                <Card
+                  className={`w-full sm:w-60 cursor-pointer transition-all duration-200 ${
+                    selectedRole === "user"
+                      ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200"
                       : "hover:bg-gray-50"
                   }`}
                   onClick={() => setSelectedRole("user")}
@@ -125,10 +125,10 @@ export default function LandingPage() {
                   </CardContent>
                 </Card>
 
-                <Card 
-                  className={`cursor-pointer transition-all duration-200 ${
-                    selectedRole === "lawyer" 
-                      ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
+                <Card
+                  className={`w-full sm:w-60 cursor-pointer transition-all duration-200 ${
+                    selectedRole === "lawyer"
+                      ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200"
                       : "hover:bg-gray-50"
                   }`}
                   onClick={() => setSelectedRole("lawyer")}
@@ -149,17 +149,18 @@ export default function LandingPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mt-8">
-              <Button 
-                size="lg" 
-                className="bg-blue-600 hover:bg-blue-700"
+            <div className="flex flex-col sm:flex-row gap-4 mt-6 justify-center items-center">
+              <Button
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700 px-8"
                 onClick={handleGetStarted}
               >
                 Get Started
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="lg"
+                className="px-8"
                 onClick={handleSignIn}
               >
                 Sign In
@@ -170,7 +171,7 @@ export default function LandingPage() {
           {/* Features */}
           <div className="space-y-4 mb-6">
             <h2 className="text-lg font-bold text-gray-900 text-center mb-4">What We Offer</h2>
-            
+
             <div className="grid grid-cols-1 gap-3">
               <Card className="p-4">
                 <div className="flex items-center space-x-3">
@@ -255,12 +256,12 @@ export default function LandingPage() {
               Try Our New Chat System
             </h3>
             <p className="text-xs text-gray-600 mb-3 leading-relaxed">
-              Experience real-time communication between users and lawyers. 
+              Experience real-time communication between users and lawyers.
               Our beta chat system is now available for testing.
             </p>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="w-full rounded-xl"
               onClick={() => setLocation("/chat")}
             >
