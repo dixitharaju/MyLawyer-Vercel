@@ -89,23 +89,27 @@ app.use((req, res, next) => {
   }
 
   // Start the server
-  const port = parseInt(process.env.PORT || '5000', 10);
-  
-  const startServer = (port: number) => {
-    server.listen(port, '127.0.0.1', () => {
-      log(`Server running on http://localhost:${port}`);
-    }).on('error', (err: NodeJS.ErrnoException) => {
+// Start the server
+const port = parseInt(process.env.PORT || '5000', 10);
+
+const startServer = (port: number) => {
+  server
+    .listen(port, '0.0.0.0', () => {
+      log(`✅ Server running on http://0.0.0.0:${port}`);
+    })
+    .on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         log(`Port ${port} is in use, trying ${port + 1}`);
         startServer(port + 1);
       } else {
-        console.error('Server error:', err);
+        console.error('❌ Server error:', err);
         process.exit(1);
       }
     });
-  };
-  
-  startServer(port);
+};
+
+startServer(port);
+
 })();
 app.use(session({
   secret: 'your-secret-key',
